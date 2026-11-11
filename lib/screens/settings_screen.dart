@@ -118,6 +118,7 @@ class SettingsScreen extends StatelessWidget {
                   onChanged: store.setFahrenheit,
                 ),
               ),
+              const UiAppearanceSection(),
               const UiUpdateSection(storeId: 'batterly'),
               const UiDeveloperSection(),
             ],

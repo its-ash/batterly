@@ -18,7 +18,6 @@ class BatterlyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return UiApp(
       title: 'Batterly',
-      themeMode: ThemeMode.system,
       home: HomeScreen(platform: platform),
     );
   }
