@@ -10,6 +10,8 @@ Live charging watts and amps, battery drain history and a charge alarm.
   power in watts, level, temperature, charger type, health, status, cycle count (Android 14+) and the
   time to full or to empty.
 - **Live chart** of watts or mA over the last two minutes.
+- **Home-screen widget**: battery level and state; live watts, amps, volts and time to full while
+  charging; temperature and the last charge's peak watts otherwise. Tap to open the app.
 - **Background monitor** (optional): an ongoing notification such as `+12.4 W · 2,450 mA · 63%`, and a
   sample logged every minute for 7 days. Starts again after a reboot.
 - **Charge alarm**: a notification (and optional vibration) when the battery reaches your limit

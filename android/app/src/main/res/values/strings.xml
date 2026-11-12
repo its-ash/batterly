@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Batterly</string>
+    <string name="widget_description">Battery level and state, live charging watts, amps and time to full.</string>
+    <string name="widget_full_in">Full in %1$s</string>
+    <string name="widget_last_peak">Last charge peak %1$s W</string>
+</resources>

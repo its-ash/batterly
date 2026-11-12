@@ -37,6 +37,16 @@ class BatteryPrefs(context: Context) {
         get() = prefs.getString(KEY_TEMP_UNIT, "c") ?: "c"
         set(v) = prefs.edit().putString(KEY_TEMP_UNIT, if (v == "f") "f" else "c").apply()
 
+    /** Peak charging watts of the current plug-in (written by the service). */
+    var sessionPeakWatts: Double
+        get() = prefs.getFloat(KEY_SESSION_PEAK, 0f).toDouble()
+        set(v) = prefs.edit().putFloat(KEY_SESSION_PEAK, v.toFloat()).apply()
+
+    /** Peak watts of the last finished charge, shown by the widget. */
+    var lastPeakWatts: Double
+        get() = prefs.getFloat(KEY_LAST_PEAK, 0f).toDouble()
+        set(v) = prefs.edit().putFloat(KEY_LAST_PEAK, v.toFloat()).apply()
+
     val alarmConfig: AlarmConfig
         get() = AlarmConfig(chargeAlarm, chargeLimit, lowReminder, lowLevel)
 
@@ -74,6 +84,8 @@ class BatteryPrefs(context: Context) {
         private const val KEY_LOW_LEVEL = "low_level"
         private const val KEY_VIBRATE = "vibrate"
         private const val KEY_TEMP_UNIT = "temp_unit"
+        private const val KEY_SESSION_PEAK = "session_peak_w"
+        private const val KEY_LAST_PEAK = "last_peak_w"
         const val KEY_ASKED_NOTIFICATIONS = "asked_notifications"
     }
 }

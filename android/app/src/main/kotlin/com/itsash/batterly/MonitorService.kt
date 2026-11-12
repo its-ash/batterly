@@ -96,6 +96,7 @@ class MonitorService : Service() {
         handler.removeCallbacksAndMessages(null)
         if (receiversRegistered) runCatching { unregisterReceiver(receiver) }
         io.shutdown()
+        runCatching { BatterlyWidget.updateAll(this) }
         super.onDestroy()
     }
 
@@ -106,6 +107,8 @@ class MonitorService : Service() {
         }
         val s = runCatching { reader.read() }.getOrNull() ?: return
         updateNotification(s)
+        trackPeak(s)
+        runCatching { BatterlyWidget.push(this, s) }
         tracker.evaluate(s.level, s.pluggedIn, prefs.alarmConfig)?.let { alert(it, s) }
         if (forceLog || s.timestampMs - lastLogMs >= LOG_INTERVAL_MS) {
             lastLogMs = s.timestampMs
@@ -116,6 +119,15 @@ class MonitorService : Service() {
                 }
             }
         }
+    }
+
+    /** Keeps the peak watts of the current charge; on unplug it becomes the widget's "last peak". */
+    private fun trackPeak(s: BatterySnapshot) {
+        val before = prefs.sessionPeakWatts
+        val last = prefs.lastPeakWatts
+        val p = WidgetLogic.updatePeaks(s.status == ChargeState.CHARGING, s.pluggedIn, s.watts, before, last)
+        if (p.session != before) prefs.sessionPeakWatts = p.session
+        if (p.last != last) prefs.lastPeakWatts = p.last
     }
 
     // --- notifications ---------------------------------------------------------------

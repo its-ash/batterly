@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen widget palette (light), from the theme package. values-night/colors.xml has the dark one. -->
+<resources>
+    <color name="widget_bg">#FFFFFFFF</color>
+    <color name="widget_text">#FF111114</color>
+    <color name="widget_muted">#FF55555F</color>
+    <color name="widget_accent">#FF16A34A</color>
+</resources>

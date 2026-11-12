@@ -17,6 +17,11 @@ battery and runs the background service; Flutter is the UI (Live, History, Setti
   - `MonitorService.kt`: `specialUse` foreground service + `BootReceiver`. Handler tick every 5 s,
     also reacts to battery and screen broadcasts, logs a sample about every 60 s and on screen on/off.
     Holds no wake lock (battery app), so deep sleep can leave gaps; analysis ignores gaps over 10 min.
+  - `BatterlyWidget.kt` + `WidgetLogic.kt`: 2x2 resizable home-screen widget (`res/layout/widget_batterly.xml`,
+    `res/xml/batterly_widget_info.xml`, `res/values*/colors.xml`). Reads via `BatteryReader`. `MonitorService`
+    pushes updates (about every 3 s while charging, otherwise on state change or every 5 min); the system also
+    refreshes every 30 min. The service stores the last charge's peak watts in `BatteryPrefs`. `WidgetLogic`
+    (pure, tested) has the throttle, peak tracking and a Kotlin copy of the Dart time-to-full formula.
   - `MainActivity.kt`: channels (below), permission screens.
 - `lib/battery/`: models and logic (`battery_snapshot`, `battery_math`, `history_analysis` are pure and
   tested), `battery_platform` (channels, `BatteryPlatform` interface for fakes), `live_store`,
