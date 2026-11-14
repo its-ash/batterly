@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:theme/theme.dart';
 
+import '../battery/battery_platform.dart';
 import '../battery/settings_store.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -37,6 +38,28 @@ class SettingsScreen extends StatelessWidget {
                     value: c.monitor,
                     onChanged: store.setMonitor,
                   ),
+                  if (c.monitor)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: UiSpace.lg, vertical: UiSpace.sm),
+                      child: UiColumn(
+                        gap: UiSpace.sm,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text('Status bar icon', style: context.text.titleSmall),
+                          UiSegmentedControl<StatusIconMode>(
+                            [for (final m in StatusIconMode.values) UiSegment(m, label: m.label)],
+                            value: c.statusIcon,
+                            expand: true,
+                            onChanged: store.setStatusIcon,
+                          ),
+                          Text(switch (c.statusIcon) {
+                            StatusIconMode.icon => 'A battery icon in the status bar.',
+                            StatusIconMode.level => 'The battery percent as the status bar icon.',
+                            StatusIconMode.watts => 'Charging watts while charging, the percent otherwise.',
+                          }, style: context.text.bodySmall?.copyWith(color: context.colors.textMuted)),
+                        ],
+                      ),
+                    ),
                   if (!s.notifications)
                     UiListTile(
                       'Allow notifications',

@@ -49,6 +49,14 @@ class SettingsStore extends ChangeNotifier {
   Future<void> setLowLevel(int percent) => _set('lowLevel', percent, config.copyWith(lowLevel: percent));
   Future<void> setVibrate(bool on) => _set('vibrate', on, config.copyWith(vibrate: on));
   Future<void> setFahrenheit(bool on) => _set('tempUnit', on ? 'f' : 'c', config.copyWith(fahrenheit: on));
+  Future<void> setStatusIcon(StatusIconMode mode) => _set('statusIcon', mode.name, config.copyWith(statusIcon: mode));
+  Future<void> setBtLowLevel(int percent) => _set('btLowLevel', percent, config.copyWith(btLowLevel: percent));
+
+  /// Turning the Bluetooth alert on asks for the Bluetooth permission first when missing.
+  Future<void> setBtAlert(bool on) async {
+    if (on && !status.bluetooth) await platform.openPermission('bluetooth');
+    await _set('btAlert', on, config.copyWith(btAlert: on));
+  }
 
   Future<void> openPermission(String name) => platform.openPermission(name);
 }

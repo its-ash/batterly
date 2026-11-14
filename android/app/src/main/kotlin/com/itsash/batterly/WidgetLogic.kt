@@ -1,5 +1,6 @@
 package com.itsash.batterly
 
+import java.util.Locale
 import kotlin.math.max
 
 /** Pure helpers for the home-screen widget (no Android types, tested in `WidgetLogicTest`). */
@@ -42,6 +43,34 @@ object WidgetLogic {
         val minutes = ((capacityMah - leftMah) / currentMa * 60).toInt()
         return if (minutes > 48 * 60) null else minutes
     }
+
+    /** "31.5 °C" or "88.7 °F". */
+    fun temperature(celsius: Double, fahrenheit: Boolean): String =
+        if (fahrenheit) String.format(Locale.US, "%.1f °F", celsius * 9 / 5 + 32) else String.format(Locale.US, "%.1f °C", celsius)
+
+    /** A point of the graph widget: x and y in 0..1 (y = level / 100, 1 at the top is drawn by the caller). */
+    data class GraphPoint(val x: Float, val y: Float)
+
+    /**
+     * Level samples between [fromMs] and [toMs] as polylines for the graph widget. A gap longer than
+     * [gapMs] (monitor off, deep sleep) splits the line instead of drawing a false straight segment.
+     * Lines with a single point are kept (the caller draws a dot).
+     */
+    fun graphLines(samples: List<Pair<Long, Int>>, fromMs: Long, toMs: Long, gapMs: Long = GRAPH_GAP_MS): List<List<GraphPoint>> {
+        if (toMs <= fromMs) return emptyList()
+        val span = (toMs - fromMs).toFloat()
+        val lines = mutableListOf<MutableList<GraphPoint>>()
+        var prevTs = Long.MIN_VALUE
+        for ((ts, level) in samples) {
+            if (ts < fromMs || ts > toMs) continue
+            val p = GraphPoint((ts - fromMs) / span, level.coerceIn(0, 100) / 100f)
+            if (lines.isEmpty() || ts - prevTs > gapMs) lines += mutableListOf(p) else lines.last() += p
+            prevTs = ts
+        }
+        return lines
+    }
+
+    const val GRAPH_GAP_MS = 10 * 60_000L
 
     /** "1h 20m", "35m", "<1m". */
     fun duration(minutes: Int): String = when {

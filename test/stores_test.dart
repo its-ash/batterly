@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:batterly/battery/battery_platform.dart';
 import 'package:batterly/battery/battery_snapshot.dart';
+import 'package:batterly/battery/health.dart';
 import 'package:batterly/battery/history_analysis.dart';
 import 'package:batterly/battery/live_store.dart';
 import 'package:batterly/battery/settings_store.dart';
@@ -36,6 +37,12 @@ class FakePlatform implements BatteryPlatform {
 
   @override
   Future<void> clearHistory() async {}
+
+  @override
+  Future<HealthInfo> health() async => const HealthInfo();
+
+  @override
+  Future<List<BtDevice>> bluetoothDevices() async => const [];
 }
 
 BatterySnapshot reading(int i, {double ma = 1000}) => BatterySnapshot(
@@ -76,7 +83,9 @@ void main() {
 
     test('start is idempotent', () {
       final p = FakePlatform();
-      final store = LiveStore(p)..start()..start();
+      final store = LiveStore(p)
+        ..start()
+        ..start();
       expect(p.controller.hasListener, isTrue);
       store.dispose();
       expect(p.controller.hasListener, isFalse);
@@ -137,6 +146,22 @@ void main() {
       expect(store.config.fahrenheit, isTrue);
       expect(p.calls, ['set chargeLimit=90', 'set tempUnit=f']);
     });
+
+    test('status icon is sent by name', () async {
+      final p = FakePlatform();
+      final store = SettingsStore(p);
+      await store.setStatusIcon(StatusIconMode.watts);
+      expect(store.config.statusIcon, StatusIconMode.watts);
+      expect(p.calls, ['set statusIcon=watts']);
+    });
+
+    test('turning the Bluetooth alert on asks for the permission first when missing', () async {
+      final p = FakePlatform()..statusValue = const PlatformStatus(bluetooth: false);
+      final store = SettingsStore(p);
+      await store.load();
+      await store.setBtAlert(true);
+      expect(p.calls, ['open bluetooth', 'set btAlert=true']);
+    });
   });
 
   test('BatteryConfig parses the channel map', () {
@@ -154,5 +179,10 @@ void main() {
     expect(c.fahrenheit, isTrue);
     expect(c.vibrate, isFalse);
     expect(c.chargeAlarm, isTrue); // default
+    expect(c.statusIcon, StatusIconMode.icon); // default
+    expect(
+      BatteryConfig.fromMap({'statusIcon': 'level', 'btAlert': true, 'btLowLevel': 15}).statusIcon,
+      StatusIconMode.level,
+    );
   });
 }

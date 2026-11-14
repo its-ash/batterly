@@ -47,6 +47,35 @@ class BatteryPrefs(context: Context) {
         get() = prefs.getFloat(KEY_LAST_PEAK, 0f).toDouble()
         set(v) = prefs.edit().putFloat(KEY_LAST_PEAK, v.toFloat()).apply()
 
+    /** Small icon of the live notification: "icon" (battery glyph), "level" (the %), "watts" (W while charging, % otherwise). */
+    var statusIcon: String
+        get() = prefs.getString(KEY_STATUS_ICON, "icon")?.takeIf { it in STATUS_ICONS } ?: "icon"
+        set(v) = prefs.edit().putString(KEY_STATUS_ICON, if (v in STATUS_ICONS) v else "icon").apply()
+
+    /** Alert when a connected Bluetooth device drops to [btLowLevel]. */
+    var btAlert: Boolean
+        get() = prefs.getBoolean(KEY_BT_ALERT, false)
+        set(v) = prefs.edit().putBoolean(KEY_BT_ALERT, v).apply()
+
+    var btLowLevel: Int
+        get() = prefs.getInt(KEY_BT_LOW_LEVEL, 20).coerceIn(5, 50)
+        set(v) = prefs.edit().putInt(KEY_BT_LOW_LEVEL, v.coerceIn(5, 50)).apply()
+
+    /** Sum of every percent charged while the monitor watched (written by the service). 100 = one cycle. */
+    var chargedPercent: Long
+        get() = prefs.getLong(KEY_CHARGED_PERCENT, 0)
+        set(v) = prefs.edit().putLong(KEY_CHARGED_PERCENT, v).apply()
+
+    /** When [chargedPercent] started counting, 0 = never. */
+    var cycleSinceMs: Long
+        get() = prefs.getLong(KEY_CYCLE_SINCE, 0)
+        set(v) = prefs.edit().putLong(KEY_CYCLE_SINCE, v).apply()
+
+    /** Last level the service saw, -1 = none. Kept across restarts so a charge while it was off still counts. */
+    var lastLevel: Int
+        get() = prefs.getInt(KEY_LAST_LEVEL, -1)
+        set(v) = prefs.edit().putInt(KEY_LAST_LEVEL, v).apply()
+
     val alarmConfig: AlarmConfig
         get() = AlarmConfig(chargeAlarm, chargeLimit, lowReminder, lowLevel)
 
@@ -58,6 +87,9 @@ class BatteryPrefs(context: Context) {
         "lowLevel" to lowLevel,
         "vibrate" to vibrate,
         "tempUnit" to tempUnit,
+        "statusIcon" to statusIcon,
+        "btAlert" to btAlert,
+        "btLowLevel" to btLowLevel,
     )
 
     /** Applies one setting from the channel. Returns false for an unknown key. */
@@ -70,6 +102,9 @@ class BatteryPrefs(context: Context) {
             "lowLevel" -> lowLevel = (value as? Number)?.toInt() ?: return false
             "vibrate" -> vibrate = value as? Boolean ?: return false
             "tempUnit" -> tempUnit = value as? String ?: return false
+            "statusIcon" -> statusIcon = (value as? String)?.takeIf { it in STATUS_ICONS } ?: return false
+            "btAlert" -> btAlert = value as? Boolean ?: return false
+            "btLowLevel" -> btLowLevel = (value as? Number)?.toInt() ?: return false
             else -> return false
         }
         return true
@@ -86,6 +121,13 @@ class BatteryPrefs(context: Context) {
         private const val KEY_TEMP_UNIT = "temp_unit"
         private const val KEY_SESSION_PEAK = "session_peak_w"
         private const val KEY_LAST_PEAK = "last_peak_w"
+        private const val KEY_STATUS_ICON = "status_icon"
+        private const val KEY_BT_ALERT = "bt_alert"
+        private const val KEY_BT_LOW_LEVEL = "bt_low_level"
+        private const val KEY_CHARGED_PERCENT = "charged_percent"
+        private const val KEY_CYCLE_SINCE = "cycle_since_ms"
+        private const val KEY_LAST_LEVEL = "last_level"
+        val STATUS_ICONS = setOf("icon", "level", "watts")
         const val KEY_ASKED_NOTIFICATIONS = "asked_notifications"
     }
 }

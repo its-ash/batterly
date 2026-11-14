@@ -22,7 +22,9 @@ import java.util.concurrent.Executors
  * Foreground service behind the "Background monitor" switch. It
  *  - keeps an ongoing notification with live "+12.4 W · 2,450 mA · 63%",
  *  - logs a sample to [HistoryDb] about once a minute (and on screen on/off),
- *  - raises the charge-limit and low-battery alerts via [AlarmTracker].
+ *  - raises the charge-limit and low-battery alerts via [AlarmTracker],
+ *  - feeds [CapacityTracker] (capacity estimates to [HistoryDb]) and counts charged percent for cycles,
+ *  - listens to Bluetooth battery broadcasts for the device low-battery alert.
  *
  * It refreshes every [TICK_MS] with a Handler and on every battery / screen broadcast.
  * No wake lock is held (this is a battery app), so while the CPU sleeps deeply the
@@ -34,6 +36,8 @@ class MonitorService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private val io = Executors.newSingleThreadExecutor()
     private val tracker = AlarmTracker()
+    private val capacity = CapacityTracker()
+    private val deviceAlarms = DeviceAlarmTracker()
 
     private lateinit var prefs: BatteryPrefs
     private lateinit var reader: BatteryReader
@@ -53,6 +57,10 @@ class MonitorService : Service() {
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == BluetoothBatteries.ACTION_BATTERY_LEVEL_CHANGED) {
+                onDeviceBattery(intent)
+                return
+            }
             refresh(forceLog = intent.action != Intent.ACTION_BATTERY_CHANGED)
         }
     }
@@ -72,6 +80,7 @@ class MonitorService : Service() {
             addAction(Intent.ACTION_BATTERY_CHANGED)
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
+            addAction(BluetoothBatteries.ACTION_BATTERY_LEVEL_CHANGED)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -88,6 +97,10 @@ class MonitorService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_REFRESH) {
+            lastText = ""
+            refresh(forceLog = false)
+        }
         return START_STICKY
     }
 
@@ -95,6 +108,7 @@ class MonitorService : Service() {
         running = false
         handler.removeCallbacksAndMessages(null)
         if (receiversRegistered) runCatching { unregisterReceiver(receiver) }
+        capacity.finish()?.let { e -> io.execute { runCatching { db.insertCapacity(e) } } }
         io.shutdown()
         runCatching { BatterlyWidget.updateAll(this) }
         super.onDestroy()
@@ -108,6 +122,7 @@ class MonitorService : Service() {
         val s = runCatching { reader.read() }.getOrNull() ?: return
         updateNotification(s)
         trackPeak(s)
+        trackHealth(s)
         runCatching { BatterlyWidget.push(this, s) }
         tracker.evaluate(s.level, s.pluggedIn, prefs.alarmConfig)?.let { alert(it, s) }
         if (forceLog || s.timestampMs - lastLogMs >= LOG_INTERVAL_MS) {
@@ -128,6 +143,38 @@ class MonitorService : Service() {
         val p = WidgetLogic.updatePeaks(s.status == ChargeState.CHARGING, s.pluggedIn, s.watts, before, last)
         if (p.session != before) prefs.sessionPeakWatts = p.session
         if (p.last != last) prefs.lastPeakWatts = p.last
+    }
+
+    /** Capacity estimate per charge / discharge, and the charged-percent sum behind the cycle estimate. */
+    private fun trackHealth(s: BatterySnapshot) {
+        val direction = CapacityTracker.directionOf(s.status, s.pluggedIn)
+        capacity.update(s.timestampMs, s.level, s.chargeCounterUah, direction)?.let { e ->
+            io.execute { runCatching { db.insertCapacity(e) } }
+        }
+        val previous = prefs.lastLevel.takeIf { it >= 0 }
+        if (previous != s.level) {
+            val added = CycleLogic.chargedDelta(previous, s.level)
+            if (added > 0) prefs.chargedPercent = prefs.chargedPercent + added
+            if (prefs.cycleSinceMs == 0L) prefs.cycleSinceMs = s.timestampMs
+            prefs.lastLevel = s.level
+        }
+    }
+
+    private fun onDeviceBattery(intent: Intent) {
+        val (device, level) = BluetoothBatteries.fromIntent(intent) ?: return
+        if (!deviceAlarms.evaluate(device.address, level, prefs.btLowLevel, prefs.btAlert)) return
+        val name = BluetoothBatteries.displayName(this, device)
+        val n = Notification.Builder(this, CHANNEL_ALARM)
+            .setSmallIcon(R.drawable.ic_stat_battery)
+            .setContentTitle("$name battery low")
+            .setContentText("$name is at $level%. Time to charge it.")
+            .setContentIntent(openAppIntent())
+            .setAutoCancel(true)
+            .build()
+        nm.notify(NOTIFICATION_DEVICE_BASE + (device.address.hashCode() and 0xFFFF), n)
+        if (prefs.vibrate) {
+            getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300, 150, 300), -1))
+        }
     }
 
     // --- notifications ---------------------------------------------------------------
@@ -154,9 +201,11 @@ class MonitorService : Service() {
         PendingIntent.FLAG_IMMUTABLE,
     )
 
-    private fun liveNotification(s: BatterySnapshot): Notification =
-        Notification.Builder(this, CHANNEL_LIVE)
-            .setSmallIcon(R.drawable.ic_stat_battery)
+    private fun liveNotification(s: BatterySnapshot): Notification {
+        val iconText = NotificationText.iconText(prefs.statusIcon, s)
+        val builder = Notification.Builder(this, CHANNEL_LIVE)
+        if (iconText != null) builder.setSmallIcon(StatusIcon.icon(iconText)) else builder.setSmallIcon(R.drawable.ic_stat_battery)
+        return builder
             .setContentTitle(NotificationText.title(s))
             .setContentText(NotificationText.summary(s))
             .setContentIntent(openAppIntent())
@@ -164,10 +213,15 @@ class MonitorService : Service() {
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .build()
+    }
+
+    /** Everything visible in the live notification; it is re-posted only when this changes. */
+    private fun notificationKey(s: BatterySnapshot): String =
+        NotificationText.title(s) + NotificationText.summary(s) + NotificationText.iconText(prefs.statusIcon, s)
 
     private fun startInForeground(s: BatterySnapshot) {
         val n = liveNotification(s)
-        lastText = NotificationText.title(s) + NotificationText.summary(s)
+        lastText = notificationKey(s)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_LIVE, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
@@ -176,7 +230,7 @@ class MonitorService : Service() {
     }
 
     private fun updateNotification(s: BatterySnapshot) {
-        val text = NotificationText.title(s) + NotificationText.summary(s)
+        val text = notificationKey(s)
         if (text == lastText) return
         lastText = text
         nm.notify(NOTIFICATION_LIVE, liveNotification(s))
@@ -208,6 +262,7 @@ class MonitorService : Service() {
         private const val CHANNEL_ALARM = "battery_alarm"
         private const val NOTIFICATION_LIVE = 11
         private const val NOTIFICATION_ALARM = 12
+        private const val NOTIFICATION_DEVICE_BASE = 1000
         private const val TICK_MS = 5_000L
         private const val LOG_INTERVAL_MS = 60_000L
 
@@ -228,6 +283,13 @@ class MonitorService : Service() {
         fun sync(context: Context) {
             if (BatteryPrefs(context).monitorEnabled) start(context) else stop(context)
         }
+
+        /** Asks a running service to redraw its notification now (after the status icon setting changed). */
+        fun refreshNotification(context: Context) {
+            if (running) context.startService(Intent(context, MonitorService::class.java).setAction(ACTION_REFRESH))
+        }
+
+        private const val ACTION_REFRESH = "com.itsash.batterly.REFRESH"
     }
 }
 

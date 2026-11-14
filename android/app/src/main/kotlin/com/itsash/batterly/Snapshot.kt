@@ -59,6 +59,29 @@ object NotificationText {
         else -> "On battery"
     }
 
+    /** Number and unit drawn as the status-bar icon, or null for the plain battery glyph. */
+    data class IconText(val value: String, val unit: String)
+
+    /**
+     * [mode] "level": the battery %. "watts": charging watts while charging with a reading of at least
+     * 0.5 W, otherwise the %. Anything else: null (glyph).
+     */
+    fun iconText(mode: String, s: BatterySnapshot): IconText? {
+        val level = IconText("${s.level}", "%")
+        return when (mode) {
+            "level" -> level
+            "watts" -> {
+                val w = s.watts
+                if (s.status == ChargeState.CHARGING && w != null && w >= 0.5) {
+                    IconText(if (w < 10) String.format(Locale.US, "%.1f", w) else "${Math.round(w)}", "W")
+                } else {
+                    level
+                }
+            }
+            else -> null
+        }
+    }
+
     private fun sign(v: Double) = if (v > 0.05) "+" else if (v < -0.05) "-" else ""
 
     private fun plugName(plugged: String) = when (plugged) {

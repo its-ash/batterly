@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Background battery monitor. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
@@ -6,6 +7,11 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Battery levels of paired Bluetooth earbuds, watches, keyboards. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- Optional, granted only with adb: Android 14+ state of health and battery dates (DeviceBattery.kt). -->
+    <uses-permission android:name="android.permission.BATTERY_STATS" tools:ignore="ProtectedPermissions"/>
     <!-- Update check in Settings (UiUpdateSection). -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
@@ -63,6 +69,30 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/batterly_widget_info"/>
+        </receiver>
+
+        <receiver
+            android:name=".BatterlySmallWidget"
+            android:exported="true"
+            android:label="@string/widget_small_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/batterly_small_widget_info"/>
+        </receiver>
+
+        <receiver
+            android:name=".BatterlyGraphWidget"
+            android:exported="true"
+            android:label="@string/widget_graph_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/batterly_graph_widget_info"/>
         </receiver>
 
         <receiver

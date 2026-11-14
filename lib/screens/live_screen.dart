@@ -189,6 +189,7 @@ class _ChartCard extends StatelessWidget {
               series: [UiChartSeries(watts ? 'Watts' : 'mA', values)],
               height: 160,
               showLegend: false,
+              animateUpdates: false, // new point every second: update in place, no redraw
               yFormat: (v) => watts ? v.toStringAsFixed(1) : v.round().toString(),
             ),
         ],

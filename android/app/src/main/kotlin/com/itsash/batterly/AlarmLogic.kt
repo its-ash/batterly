@@ -40,3 +40,20 @@ class AlarmTracker {
         const val LOW_HYSTERESIS = 5
     }
 }
+
+/**
+ * Low-battery alert for Bluetooth devices, keyed by address. Fires once when a device reaches
+ * [threshold] or less, re-arms when it reports [threshold] + 5 or more (it was charged).
+ */
+class DeviceAlarmTracker {
+    private val fired = HashSet<String>()
+
+    /** True when an alert should be raised for this reading. */
+    fun evaluate(address: String, level: Int, threshold: Int, enabled: Boolean): Boolean {
+        if (level < 0) return false
+        if (level >= threshold + 5) fired.remove(address)
+        if (!enabled || level > threshold || address in fired) return false
+        fired += address
+        return true
+    }
+}

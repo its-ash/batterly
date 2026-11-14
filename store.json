@@ -4,7 +4,7 @@
   "repo": "its-ash/batterly",
   "package": "com.itsash.batterly",
   "tagline": "Live charging watts and amps, battery drain history and a charge alarm.",
-  "description": "Batterly shows what your battery is really doing. See the live charging current in mA, voltage, power in watts, temperature, charger type, health and the time to full. A background monitor logs your battery every minute for seven days, so you can see which hours drain the most, how much the screen costs you, and how each charge session went: start and end level, duration, average and peak watts. Set a charge limit and get an alarm when the battery reaches it. Everything stays on your phone.",
+  "description": "Batterly shows what your battery is really doing. See the live charging current in mA, voltage, power in watts, temperature, charger type, health and the time to full. A background monitor logs your battery every minute for seven days, so you can see which hours drain the most, how much the screen costs you, and how each charge session went: start and end level, duration, average and peak watts. Set a charge limit and get an alarm when the battery reaches it. Batterly also measures your battery's real capacity to show its health, counts charge cycles, shows the battery of your Bluetooth earbuds and watch, and puts the percent or live watts in the status bar and on three home-screen widgets. Everything stays on your phone.",
   "category": "Utilities",
   "icon": "assets/icon/logo-1024.png",
   "homepage": "https://batterly.itsash.in/"

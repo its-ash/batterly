@@ -4,11 +4,13 @@ import 'package:theme/theme.dart';
 import '../battery/battery_platform.dart';
 import '../battery/live_store.dart';
 import '../battery/settings_store.dart';
+import 'devices_screen.dart';
+import 'health_screen.dart';
 import 'history_screen.dart';
 import 'live_screen.dart';
 import 'settings_screen.dart';
 
-/// Live and History tabs. The live stream runs only while the Live tab is on screen.
+/// Live, History, Health and Devices tabs. The live stream runs only while the Live tab is on screen.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, required this.platform});
 
@@ -86,7 +88,12 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               UiTabs(
-                tabs: const [UiTab('Live', icon: Icons.bolt_rounded), UiTab('History', icon: Icons.show_chart_rounded)],
+                tabs: const [
+                  UiTab('Live', icon: Icons.bolt_rounded),
+                  UiTab('History', icon: Icons.show_chart_rounded),
+                  UiTab('Health', icon: Icons.favorite_rounded),
+                  UiTab('Devices', icon: Icons.headphones_rounded),
+                ],
                 index: _tab,
                 variant: UiTabsVariant.segment,
                 onChanged: (i) {
@@ -94,15 +101,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   _sync();
                 },
               ),
-              if (_tab == 0)
-                LiveScreen(store: _live, fahrenheit: config.fahrenheit)
-              else
-                HistoryScreen(
+              switch (_tab) {
+                0 => LiveScreen(store: _live, fahrenheit: config.fahrenheit),
+                1 => HistoryScreen(
                   key: ValueKey(config.monitor),
                   platform: widget.platform,
                   monitorOn: config.monitor,
                   onOpenSettings: _openSettings,
                 ),
+                2 => HealthScreen(
+                  key: ValueKey(config.monitor),
+                  platform: widget.platform,
+                  monitorOn: config.monitor,
+                  sdk: _settings.status.sdk,
+                  onOpenSettings: _openSettings,
+                ),
+                _ => DevicesScreen(settings: _settings, onOpenSettings: _openSettings),
+              },
             ],
           ),
         );

@@ -18,12 +18,17 @@ import java.util.concurrent.Executors
 
 /**
  * MethodChannel "com.itsash.batterly/control" (Dart: lib/battery/battery_platform.dart):
- *   - getConfig() -> {monitor, chargeAlarm, chargeLimit, lowReminder, lowLevel, vibrate, tempUnit, running}
- *   - setConfig({key, value}): saves one setting; "monitor" also starts/stops MonitorService.
- *   - status() -> {notifications, batteryOptimizationsIgnored, hasCurrentSensor}
- *   - openPermission({name}): "notifications" | "battery".
+ *   - getConfig() -> {monitor, chargeAlarm, chargeLimit, lowReminder, lowLevel, vibrate, tempUnit,
+ *     statusIcon, btAlert, btLowLevel, running}
+ *   - setConfig({key, value}): saves one setting; "monitor" also starts/stops MonitorService,
+ *     "statusIcon" redraws its notification.
+ *   - status() -> {notifications, batteryOptimizationsIgnored, hasCurrentSensor, bluetooth, sdk}
+ *   - openPermission({name}): "notifications" | "battery" | "bluetooth".
  *   - samples({sinceMs}) -> [{ts, level, currentMa, voltageMv, tempC, plugged, screenOn}] oldest first.
- *   - clearHistory().
+ *   - clearHistory(): samples only; capacity estimates stay.
+ *   - health() -> {designMah?, estimates: [{ts, mah, fromLevel, toLevel, charging}], chargedPercent,
+ *     cycleSinceMs, cycleCount?, statsGranted, stateOfHealth?, manufactureDateMs?, firstUseDateMs?, chargingPolicy?}
+ *   - bluetoothDevices() -> [{address, name, kind, connected, level?}]
  * EventChannel "com.itsash.batterly/live": a BatterySnapshot map (see Snapshot.kt) every second
  * while Flutter listens.
  */
@@ -52,6 +57,7 @@ class MainActivity : FlutterActivity() {
                             result.error("bad_setting", "Unknown or invalid setting: $key", null)
                         } else {
                             if (key == "monitor") MonitorService.sync(this)
+                            if (key == "statusIcon") MonitorService.refreshNotification(this)
                             result.success(null)
                         }
                     }
@@ -69,6 +75,17 @@ class MainActivity : FlutterActivity() {
                                     .onFailure { result.error("db", it.message, null) }
                             }
                         }
+                    }
+                    "health" -> io.execute {
+                        val info = runCatching { health(prefs, reader, history) }
+                        ui.post {
+                            info.onSuccess { result.success(it) }
+                                .onFailure { result.error("health", it.message, null) }
+                        }
+                    }
+                    "bluetoothDevices" -> io.execute {
+                        val list = runCatching { BluetoothBatteries.list(this) }.getOrDefault(emptyList())
+                        ui.post { result.success(list) }
                     }
                     "clearHistory" -> io.execute {
                         runCatching { history.clear() }
@@ -125,8 +142,19 @@ class MainActivity : FlutterActivity() {
             "notifications" to notifications,
             "batteryOptimizationsIgnored" to power.isIgnoringBatteryOptimizations(packageName),
             "hasCurrentSensor" to reader.hasCurrentSensor(),
+            "bluetooth" to BluetoothBatteries.permitted(this),
+            "sdk" to Build.VERSION.SDK_INT,
         )
     }
+
+    private fun health(prefs: BatteryPrefs, reader: BatteryReader, history: HistoryDb): Map<String, Any?> =
+        mapOf(
+            "designMah" to DeviceBattery.designCapacityMah(this),
+            "estimates" to history.capacityEstimates(),
+            "chargedPercent" to prefs.chargedPercent,
+            "cycleSinceMs" to prefs.cycleSinceMs,
+            "cycleCount" to runCatching { reader.read().cycleCount }.getOrNull(),
+        ) + DeviceBattery.advanced(this)
 
     private fun openPermission(name: String?) {
         when (name) {
@@ -146,7 +174,23 @@ class MainActivity : FlutterActivity() {
                 @Suppress("BatteryLife")
                 startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName")))
             }
+            "bluetooth" -> {
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+                val sp = getSharedPreferences(BatteryPrefs.FILE, MODE_PRIVATE)
+                if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED &&
+                    (!sp.getBoolean(KEY_ASKED_BLUETOOTH, false) || shouldShowRequestPermissionRationale(Manifest.permission.BLUETOOTH_CONNECT))
+                ) {
+                    sp.edit().putBoolean(KEY_ASKED_BLUETOOTH, true).apply()
+                    requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 2)
+                } else {
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+                }
+            }
         }
+    }
+
+    private companion object {
+        const val KEY_ASKED_BLUETOOTH = "asked_bluetooth"
     }
 
     /** Ask with the system dialog once; after that, open the app's notification settings. */

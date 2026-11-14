@@ -26,13 +26,17 @@ class BatterlyWidget : AppWidgetProvider() {
         private var lastPushMs = 0L
         private var lastKey = ""
 
-        /** Updates every placed widget with [s] (or a fresh reading). */
+        /** Updates every placed widget (this one, [BatterlySmallWidget], [BatterlyGraphWidget]) with [s] or a fresh reading. */
         fun updateAll(context: Context, s: BatterySnapshot? = null) {
             val manager = AppWidgetManager.getInstance(context)
+            val reading by lazy { s ?: runCatching { BatteryReader(context).read() }.getOrNull() }
             val ids = manager.getAppWidgetIds(ComponentName(context, BatterlyWidget::class.java))
-            if (ids.isEmpty()) return
-            val views = build(context, s ?: runCatching { BatteryReader(context).read() }.getOrNull())
-            for (id in ids) manager.updateAppWidget(id, views)
+            if (ids.isNotEmpty()) {
+                val views = build(context, reading)
+                for (id in ids) manager.updateAppWidget(id, views)
+            }
+            BatterlySmallWidget.update(context, manager) { reading }
+            BatterlyGraphWidget.update(context, manager) { reading }
         }
 
         /** Called by the service on every refresh; pushes only when [WidgetLogic.pushDue] says so. */
@@ -83,12 +87,7 @@ class BatterlyWidget : AppWidgetProvider() {
                 setExtra(views, eta?.let { context.getString(R.string.widget_full_in, WidgetLogic.duration(it)) })
             } else {
                 views.setTextViewText(R.id.widget_main, "${s.level}%")
-                val temp = if (prefs.tempUnit == "f") {
-                    String.format(Locale.US, "%.1f °F", s.temperatureC * 9 / 5 + 32)
-                } else {
-                    String.format(Locale.US, "%.1f °C", s.temperatureC)
-                }
-                views.setTextViewText(R.id.widget_detail, temp)
+                views.setTextViewText(R.id.widget_detail, WidgetLogic.temperature(s.temperatureC, prefs.tempUnit == "f"))
                 val peak = prefs.lastPeakWatts
                 setExtra(views, if (peak > 0) context.getString(R.string.widget_last_peak, String.format(Locale.US, "%.1f", peak)) else null)
             }

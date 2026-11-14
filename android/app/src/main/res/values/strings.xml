@@ -4,4 +4,12 @@
     <string name="widget_description">Battery level and state, live charging watts, amps and time to full.</string>
     <string name="widget_full_in">Full in %1$s</string>
     <string name="widget_last_peak">Last charge peak %1$s W</string>
+    <string name="widget_small_description">Battery level, with charging watts or the temperature.</string>
+    <string name="widget_graph_description">Level and charging watts with a 24-hour level graph.</string>
+    <string name="widget_graph_caption">Battery level, last 24 hours</string>
+    <string name="widget_graph_empty">Turn on the background monitor in Batterly for the graph</string>
+    <string name="widget_charging">Charging</string>
+    <string name="widget_full">Full</string>
+    <string name="widget_small_label">Batterly level</string>
+    <string name="widget_graph_label">Batterly graph</string>
 </resources>

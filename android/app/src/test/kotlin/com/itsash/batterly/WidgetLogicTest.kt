@@ -8,6 +8,35 @@ import org.junit.Test
 
 class WidgetLogicTest {
     @Test
+    fun graphSplitsOnGapsAndScales() {
+        val min = 60_000L
+        val samples = listOf(
+            0L to 100,
+            1 * min to 99,
+            2 * min to 98,
+            // 30 min gap: new line
+            32 * min to 90,
+            33 * min to 89,
+            200 * min to 50, // outside the range
+        )
+        val lines = WidgetLogic.graphLines(samples, 0, 100 * min)
+        assertEquals(2, lines.size)
+        assertEquals(3, lines[0].size)
+        assertEquals(2, lines[1].size)
+        assertEquals(0f, lines[0][0].x, 1e-6f)
+        assertEquals(1f, lines[0][0].y, 1e-6f)
+        assertEquals(0.32f, lines[1][0].x, 1e-6f)
+        assertEquals(0.9f, lines[1][0].y, 1e-6f)
+        assertTrue(WidgetLogic.graphLines(samples, 10, 10).isEmpty())
+    }
+
+    @Test
+    fun temperatureText() {
+        assertEquals("31.5 °C", WidgetLogic.temperature(31.5, false))
+        assertEquals("86.0 °F", WidgetLogic.temperature(30.0, true))
+    }
+
+    @Test
     fun throttlesWhileCharging() {
         assertFalse(WidgetLogic.pushDue(10_000, 8_000, charging = true, stateChanged = false))
         assertTrue(WidgetLogic.pushDue(11_000, 8_000, charging = true, stateChanged = false))
