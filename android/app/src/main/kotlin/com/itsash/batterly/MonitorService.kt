@@ -57,11 +57,15 @@ class MonitorService : Service() {
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            refresh(forceLog = intent.action != Intent.ACTION_BATTERY_CHANGED)
+        }
+    }
+
+    private val btReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == BluetoothBatteries.ACTION_BATTERY_LEVEL_CHANGED) {
                 onDeviceBattery(intent)
-                return
             }
-            refresh(forceLog = intent.action != Intent.ACTION_BATTERY_CHANGED)
         }
     }
 
@@ -80,12 +84,14 @@ class MonitorService : Service() {
             addAction(Intent.ACTION_BATTERY_CHANGED)
             addAction(Intent.ACTION_SCREEN_ON)
             addAction(Intent.ACTION_SCREEN_OFF)
-            addAction(BluetoothBatteries.ACTION_BATTERY_LEVEL_CHANGED)
         }
+        val btFilter = IntentFilter(BluetoothBatteries.ACTION_BATTERY_LEVEL_CHANGED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            registerReceiver(btReceiver, btFilter, Context.RECEIVER_EXPORTED)
         } else {
             registerReceiver(receiver, filter)
+            registerReceiver(btReceiver, btFilter)
         }
         receiversRegistered = true
         running = true
@@ -107,8 +113,12 @@ class MonitorService : Service() {
     override fun onDestroy() {
         running = false
         handler.removeCallbacksAndMessages(null)
-        if (receiversRegistered) runCatching { unregisterReceiver(receiver) }
+        if (receiversRegistered) {
+            runCatching { unregisterReceiver(receiver) }
+            runCatching { unregisterReceiver(btReceiver) }
+        }
         capacity.finish()?.let { e -> io.execute { runCatching { db.insertCapacity(e) } } }
+        if (::db.isInitialized) io.execute { runCatching { db.close() } }
         io.shutdown()
         runCatching { BatterlyWidget.updateAll(this) }
         super.onDestroy()

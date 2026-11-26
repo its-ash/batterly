@@ -11,6 +11,17 @@ class SettingsStore extends ChangeNotifier {
   BatteryConfig config = const BatteryConfig();
   PlatformStatus status = const PlatformStatus();
   bool loaded = false;
+  bool _disposed = false;
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
 
   /// Reads the native settings and permission state. Call again after returning from system settings.
   Future<void> load() async {
@@ -21,18 +32,18 @@ class SettingsStore extends ChangeNotifier {
       debugPrint('Batterly: could not load settings: $e');
     }
     loaded = true;
-    notifyListeners();
+    _notify();
   }
 
   /// Shows [next] right away (sliders must follow the finger) and saves it natively. Switching the
   /// monitor re-reads the state afterwards to learn whether the service is running.
   Future<void> _set(String key, Object value, BatteryConfig next) async {
     config = next;
-    notifyListeners();
+    _notify();
     await platform.setConfig(key, value);
     if (key == 'monitor') {
       config = await platform.getConfig();
-      notifyListeners();
+      _notify();
     }
   }
 

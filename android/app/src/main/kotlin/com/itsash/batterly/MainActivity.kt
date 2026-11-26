@@ -100,6 +100,7 @@ class MainActivity : FlutterActivity() {
 
         EventChannel(messenger, "com.itsash.batterly/live").setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                liveTick?.let { liveHandler.removeCallbacks(it) }
                 val tick = object : Runnable {
                     override fun run() {
                         try {
@@ -124,9 +125,10 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         liveTick?.let { liveHandler.removeCallbacks(it) }
         liveTick = null
-        io.shutdown()
-        db?.close()
+        val closing = db
         db = null
+        io.execute { runCatching { closing?.close() } }
+        io.shutdown()
         super.onDestroy()
     }
 

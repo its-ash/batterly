@@ -66,9 +66,10 @@ class _HomeScreenState extends State<HomeScreen> {
     _foreground = false;
     _sync();
     await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => SettingsScreen(store: _settings)));
+    if (!mounted) return;
     _foreground = true;
     _sync();
-    if (mounted) setState(() {}); // the History tab re-reads when the monitor was switched
+    setState(() {}); // the History tab re-reads when the monitor was switched
   }
 
   @override
